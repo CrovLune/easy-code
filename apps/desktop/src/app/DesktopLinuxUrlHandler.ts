@@ -29,11 +29,14 @@ export class DesktopLinuxUrlHandlerRegistrationError extends Schema.TaggedErrorC
   {
     step: Schema.Literals(["write-desktop-entry", "set-default-handler"]),
     scheme: Schema.String,
-    cause: Schema.Defect(),
+    desktopEntryPath: Schema.optionalKey(Schema.String),
+    exitCode: Schema.optionalKey(Schema.Number),
+    cause: Schema.optionalKey(Schema.Defect()),
   },
 ) {
   override get message(): string {
-    return `Failed to register the ${this.scheme}:// URL handler (step: ${this.step}).`;
+    const exitCode = this.exitCode === undefined ? "" : `, xdg-mime exit code ${this.exitCode}`;
+    return `Failed to register the ${this.scheme}:// URL handler (step: ${this.step}${exitCode}).`;
   }
 }
 
@@ -92,6 +95,10 @@ export const make = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
   const scheme = ElectronProtocol.getDesktopScheme(environment.isDevelopment);
+  const desktopEntryPath = environment.path.join(
+    environment.linuxApplicationsDir,
+    URL_HANDLER_DESKTOP_ENTRY_NAME,
+  );
 
   const writeDesktopEntry = Effect.gen(function* () {
     // Inside the mounted AppImage, process.execPath points at a transient
@@ -99,7 +106,7 @@ export const make = Effect.gen(function* () {
     const execTarget = Option.getOrElse(environment.appImagePath, () => process.execPath);
     yield* fileSystem.makeDirectory(environment.linuxApplicationsDir, { recursive: true });
     yield* fileSystem.writeFileString(
-      environment.path.join(environment.linuxApplicationsDir, URL_HANDLER_DESKTOP_ENTRY_NAME),
+      desktopEntryPath,
       renderUrlHandlerDesktopEntry({
         displayName: environment.displayName,
         execTarget,
@@ -113,6 +120,7 @@ export const make = Effect.gen(function* () {
         new DesktopLinuxUrlHandlerRegistrationError({
           step: "write-desktop-entry",
           scheme,
+          desktopEntryPath,
           cause,
         }),
     ),
@@ -135,7 +143,7 @@ export const make = Effect.gen(function* () {
         return yield* new DesktopLinuxUrlHandlerRegistrationError({
           step: "set-default-handler",
           scheme,
-          cause: new Error(`xdg-mime exited with code ${String(exitCode)}`),
+          exitCode: Number(exitCode),
         });
       }
     }),
@@ -166,6 +174,10 @@ export const make = Effect.gen(function* () {
         scheme,
         step: error.step,
         message: error.message,
+        ...(error.desktopEntryPath === undefined
+          ? {}
+          : { desktopEntryPath: error.desktopEntryPath }),
+        ...(error.exitCode === undefined ? {} : { exitCode: error.exitCode }),
       }),
     ),
     Effect.withSpan("desktop.linuxUrlHandler.register"),
