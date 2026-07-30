@@ -113,7 +113,13 @@ describe("DesktopLinuxUrlHandler", () => {
 
     assert.include(entry, "[Desktop Entry]");
     assert.include(entry, "Name=T3 Code (Nightly)");
-    assert.include(entry, 'Exec="/home/al ice/Apps/T3 \\"100%%\\" \\$HOME\\\\x.AppImage" %U');
+    // Exec composes both escaping layers: a literal backslash becomes four
+    // backslashes in the file, a quote three characters, a dollar sign two
+    // backslashes plus the sign.
+    assert.include(
+      entry,
+      'Exec="/home/al ice/Apps/T3 \\\\"100%%\\\\" \\\\$HOME\\\\\\\\x.AppImage" %U',
+    );
     assert.include(entry, "NoDisplay=true");
     assert.include(entry, "StartupWMClass=t3code");
     assert.include(entry, "MimeType=x-scheme-handler/t3code;");

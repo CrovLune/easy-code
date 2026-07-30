@@ -49,17 +49,20 @@ const escapeDesktopEntryString = (value: string): string =>
     .replaceAll("\r", "\\r")
     .replaceAll("\t", "\\t");
 
-// Exec values follow the freedesktop quoting rules: the argument is
-// double-quoted, reserved characters are backslash-escaped inside the quotes,
-// and literal percent signs are doubled so they are not read as field codes.
+// Exec values are unescaped twice by implementations: first the general
+// string-value rules, then the Exec quoting rules — so writing composes the
+// layers in reverse. The argument is double-quoted with reserved characters
+// backslash-escaped and literal percent signs doubled (field codes), and the
+// general string escaping is applied on top: a literal backslash ends up as
+// four backslashes in the file, a quote as \\", a dollar sign as \\$.
 export function escapeDesktopEntryExecArgument(value: string): string {
-  const escaped = value
+  const quoted = value
     .replaceAll("\\", () => "\\\\")
     .replaceAll("`", () => "\\`")
     .replaceAll("$", () => "\\$")
     .replaceAll('"', () => '\\"')
     .replaceAll("%", () => "%%");
-  return `"${escaped}"`;
+  return escapeDesktopEntryString(`"${quoted}"`);
 }
 
 export function renderUrlHandlerDesktopEntry(input: {
